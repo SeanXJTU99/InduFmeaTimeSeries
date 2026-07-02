@@ -1,0 +1,53 @@
+# Core numerical / scientific
+numpy>=1.24,<2.0
+scipy>=1.10
+pandas>=2.0
+scikit-learn>=1.3
+
+# Signal processing
+PyWavelets>=1.4
+
+# Time-series alignment
+dtw-python>=1.3
+fastdtw>=0.3
+
+# ML / DL (stage-dependent)
+xgboost>=2.0
+torch>=2.0
+transformers>=4.30
+accelerate>=0.20
+peft>=0.5
+trl>=0.7
+
+# RAG / Vector
+faiss-cpu>=1.7
+sentence-transformers>=2.2
+rank-bm25>=0.2
+
+# Agent framework
+langgraph>=0.0.30
+langchain>=0.1.0
+pydantic>=2.0
+
+# Safety / constrained decoding
+outlines>=0.0.30
+guardrails-ai>=0.4
+
+# Deployment
+vllm>=0.3
+tensorrt-llm  # installed separately via Jetson SDK
+awq>=0.1
+
+# Document parsing
+markitdown>=0.0.1
+
+# RL
+gymnasium>=0.29
+
+# Testing
+pytest>=7.0
+pytest-cov>=4.0
+
+# Utilities
+pyyaml>=6.0
+tqdm>=4.65

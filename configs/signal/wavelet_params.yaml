@@ -1,0 +1,29 @@
+# Wavelet denoising parameters
+# All values are fictitious — see docs/data_notice.md
+
+default:
+  wavelet: db4           # Daubechies-4 — good for piecewise-smooth process signals
+  level: 3               # decomposition depth
+  mode: "per"            # periodic boundary extension
+  threshold_mode: soft   # soft thresholding (smoother than hard)
+  threshold_method: universal  # Donoho-Johnstone universal threshold
+  sigma_method: median   # noise std from median absolute deviation of finest detail
+
+# Per-signal-type overrides
+signal_overrides:
+  pressure:
+    level: 2             # less decomposition for faster signals
+    wavelet: db4
+
+  flow_rate:
+    level: 2
+    wavelet: db6         # db6 for sharper transients
+
+  temperature:
+    level: 4             # deeper decomposition for slow cryogenic signals
+    wavelet: db4
+    threshold_mode: soft
+
+  valve_position:
+    level: 1             # minimal smoothing for discrete-step signals
+    threshold_method: sure

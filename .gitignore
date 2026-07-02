@@ -1,0 +1,64 @@
+# Data files (may contain real industrial data)
+*.xlsx
+*.xls
+*.csv
+*.tsv
+
+# Model artifacts
+*.pth
+*.bin
+*.pt
+*.onnx
+*.engine  # TensorRT serialised engines
+
+# Raw data directories
+raw_data/
+data/raw/
+
+# Checkpoints
+checkpoints/
+*.ckpt
+
+# Secrets and credentials
+secrets.yaml
+.env
+*.key
+*.pem
+
+# Project metadata (not for commit)
+CLAUDE.md
+工业时序数据检测和预测.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Docker
+.docker/
+
+# Logs
+*.log
+logs/

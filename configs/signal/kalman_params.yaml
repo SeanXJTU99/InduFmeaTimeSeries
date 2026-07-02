@@ -1,0 +1,33 @@
+# Kalman filter parameters for two-stage cascade
+# All tag names and values are fictitious — see docs/data_notice.md
+
+# Stage 1 — Sensor-level EMI rejection (per channel)
+stage1:
+  process_noise: 1.0e-5     # Q: process noise covariance
+  measurement_noise: 1.0e-3  # R: measurement noise covariance
+  estimated_error: 1.0       # initial state error covariance
+  max_innovation: null       # clip innovation (null = no clipping)
+
+# Stage 2 — Physics-informed process-level filtering
+stage2:
+  process_noise: 1.0e-6     # Q: tighter trust in physical model
+  measurement_noise: 5.0e-3  # R: moderate trust in stage-1 output
+  estimated_error: 0.5
+  max_innovation: null
+
+# Per-tag overrides (fictitious tag names)
+tag_overrides:
+  PT-301:  # column T-301 top pressure — fast, noisy
+    stage1:
+      measurement_noise: 5.0e-4
+    stage2:
+      process_noise: 5.0e-7
+  FT-301:  # feed flow — moderate noise
+    stage1:
+      measurement_noise: 2.0e-3
+  TE-301:  # cryogenic temperature — slow, high inertia
+    stage1:
+      process_noise: 1.0e-7
+      measurement_noise: 1.0e-2
+    stage2:
+      process_noise: 1.0e-8
