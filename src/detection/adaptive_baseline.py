@@ -12,9 +12,10 @@ that adapts to slow drift while remaining sensitive to abrupt anomalies.
 
 from __future__ import annotations
 
+import math
 import numpy as np
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Tuple
 from collections import deque
 
 
@@ -27,7 +28,7 @@ class BaselineConfig:
     samples_per_day: int = 1440  # samples/day (1-min resolution)
     n_sigma: float = 3.0  # anomaly threshold in std deviations
     min_window_samples: int = 1000  # minimum samples before scoring
-    kde_bandwidth: str = "scott"  # bandwidth selection: 'scott', 'silverman', or float
+    min_std: float = 1e-6  # minimum standard deviation floor
 
 
 class EWMAKDEBaseline:
@@ -51,8 +52,6 @@ class EWMAKDEBaseline:
         self._window: deque[float] = deque(
             maxlen=self._cfg.window_days * self._cfg.samples_per_day
         )
-        self._kde_centers: Optional[np.ndarray] = None
-        self._kde_bandwidth: float = 1.0
 
     # ------------------------------------------------------------------
     # Public API
@@ -63,15 +62,21 @@ class EWMAKDEBaseline:
 
         Args:
             value: latest sensor reading.
+
+        NaN/inf values are silently dropped — they would permanently
+        corrupt the EWMA state.
         """
+        if not math.isfinite(value):
+            return
         self._window.append(value)
         if not self._initialised:
             self._ewma = value
             self._initialised = True
         else:
             alpha = self._cfg.ewma_alpha
-            self._ewma = alpha * value + (1.0 - alpha) * self._ewma
+            # Compute delta using PRE-update EWMA for correct variance estimate
             delta = value - self._ewma
+            self._ewma = alpha * value + (1.0 - alpha) * self._ewma
             self._ewma_var = alpha * delta**2 + (1.0 - alpha) * self._ewma_var
 
     def check(self, value: float) -> Tuple[float, bool]:
@@ -83,16 +88,18 @@ class EWMAKDEBaseline:
         Returns:
             (z_score, is_anomalous) tuple.
         """
+        if not math.isfinite(value):
+            return 0.0, False
         if len(self._window) < self._cfg.min_window_samples:
             return 0.0, False
 
-        std = np.sqrt(self._ewma_var) if self._ewma_var > 0 else 1e-6
+        std = math.sqrt(self._ewma_var) if self._ewma_var > 0 else self._cfg.min_std
         z = (value - self._ewma) / std
         return float(z), abs(z) > self._cfg.n_sigma
 
     def get_envelope(self) -> Tuple[float, float, float]:
         """Return (center, lower_bound, upper_bound) of the current envelope."""
-        std = np.sqrt(self._ewma_var) if self._ewma_var > 0 else 1e-6
+        std = math.sqrt(self._ewma_var) if self._ewma_var > 0 else self._cfg.min_std
         n = self._cfg.n_sigma
         return (self._ewma, self._ewma - n * std, self._ewma + n * std)
 

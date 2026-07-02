@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import numpy as np
 from dataclasses import dataclass, field
-from typing import Optional, Sequence
+from typing import Sequence
 
 
 @dataclass
@@ -110,6 +110,8 @@ class VirtualSoftSensor:
 
         Fictitious formula — for demonstration only.
         """
+        if len(features) < 2:
+            return 50.0  # safe default when features are incomplete
         T_norm = float(features[0]) / 200.0  # normalise temperature
         P_norm = float(features[1]) / 15.0  # normalise pressure
         base = 95.0 + 3.0 * (1.0 - T_norm) - 2.0 * (P_norm - 1.0)

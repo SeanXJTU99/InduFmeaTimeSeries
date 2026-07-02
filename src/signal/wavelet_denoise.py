@@ -11,10 +11,10 @@ process signals.  Soft thresholding via the universal threshold
 
 from __future__ import annotations
 
+import math
 import numpy as np
 import pywt
 from dataclasses import dataclass
-from typing import Optional, Sequence
 
 
 @dataclass
@@ -56,7 +56,19 @@ class WaveletDenoiser:
 
         Returns:
             1-D array of denoised values (same length).
+
+        Raises:
+            ValueError: if signal length is insufficient for the configured
+                decomposition level.
         """
+        # Guard: insufficient data for requested decomposition level
+        max_lvl = pywt.dwt_max_level(len(data), self._p.wavelet)
+        safe_level = min(self._p.level, max_lvl)
+        if safe_level != self._p.level:
+            raise ValueError(
+                f"Signal length {len(data)} too short for level={self._p.level} "
+                f"with wavelet '{self._p.wavelet}'. Maximum is {max_lvl}."
+            )
         if len(data) < 2:
             return data.copy()
 
@@ -68,10 +80,10 @@ class WaveletDenoiser:
         # Estimate noise standard deviation from finest detail coefficients
         sigma = self._estimate_sigma(coeffs[-1])
 
-        # Threshold detail coefficients (keep approximation untouched)
-        threshold = self._compute_threshold(sigma, len(data))
-        new_coeffs = [coeffs[0]]  # approximation
+        # Per-subband thresholding (each detail level gets its own threshold)
+        new_coeffs: list[np.ndarray] = [coeffs[0]]  # approximation — untouched
         for detail in coeffs[1:]:
+            threshold = self._compute_threshold(sigma, len(data), detail)
             new_coeffs.append(self._apply_threshold(detail, threshold))
 
         # Reconstruct
@@ -100,14 +112,32 @@ class WaveletDenoiser:
         # fallback: standard deviation
         return float(np.std(detail))
 
-    def _compute_threshold(self, sigma: float, n_samples: int) -> float:
-        """Compute threshold value."""
+    def _compute_threshold(
+        self, sigma: float, n_samples: int, detail: np.ndarray
+    ) -> float:
+        """Compute threshold value for a given detail subband.
+
+        Args:
+            sigma: estimated noise standard deviation.
+            n_samples: total signal length (used by universal / SURE).
+            detail: the detail coefficient array for this subband
+                (used by Bayes shrink to estimate signal variance).
+
+        Returns:
+            Threshold value.
+        """
         if self._p.threshold_method == "universal":
             return float(sigma * np.sqrt(2.0 * np.log(n_samples)))
         if self._p.threshold_method == "sure":
             return float(sigma * np.sqrt(np.log(n_samples)))
-        # Bayes shrink
-        return float(sigma**2 / max(np.sqrt(max(sigma**2 - sigma**2, 0)), 1e-10))
+        # Bayes shrink: T = sigma² / sigma_x
+        # where sigma_x = sqrt(max(var(observed) - sigma², 0))
+        var_y = float(np.var(detail))
+        sigma_x_sq = max(var_y - sigma**2, 0.0)
+        if sigma_x_sq < 1e-15:
+            # negligible signal energy — fall back to universal threshold
+            return float(sigma * np.sqrt(2.0 * np.log(n_samples)))
+        return float(sigma**2 / math.sqrt(sigma_x_sq))
 
     def _apply_threshold(self, coeffs: np.ndarray, threshold: float) -> np.ndarray:
         """Apply soft or hard thresholding."""

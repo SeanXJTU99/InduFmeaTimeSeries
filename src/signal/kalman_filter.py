@@ -9,7 +9,7 @@ All tag names and parameters are fictitious — see docs/data_notice.md.
 from __future__ import annotations
 
 import numpy as np
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 
@@ -22,6 +22,21 @@ class KalmanParams:
     estimated_error: float = 1.0  # initial state error covariance
     initial_value: float = 0.0  # initial state estimate
     max_innovation: Optional[float] = None  # clip innovation to this magnitude
+
+    def __post_init__(self) -> None:
+        """Validate noise covariances are positive."""
+        if self.process_noise <= 0:
+            raise ValueError(
+                f"process_noise (Q) must be positive, got {self.process_noise}"
+            )
+        if self.measurement_noise <= 0:
+            raise ValueError(
+                f"measurement_noise (R) must be positive, got {self.measurement_noise}"
+            )
+        if self.estimated_error <= 0:
+            raise ValueError(
+                f"estimated_error must be positive, got {self.estimated_error}"
+            )
 
 
 class KalmanFilter:
@@ -136,6 +151,16 @@ class TwoStageKalmanFilter:
         """Reset both stages."""
         self.stage1.reset()
         self.stage2.reset()
+
+    @property
+    def state(self) -> float:
+        """Final (stage-2) filtered state estimate."""
+        return self.stage2.state
+
+    @property
+    def covariance(self) -> float:
+        """Final (stage-2) state error covariance."""
+        return self.stage2.covariance
 
 
 def batch_filter(

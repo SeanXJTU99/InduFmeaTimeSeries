@@ -53,8 +53,15 @@ class DTWAligner:
 
         Returns:
             :class:`DTWResult` with cost matrix, path, and lag statistics.
+
+        Raises:
+            ValueError: if either input series is empty.
         """
         n, m = len(series_a), len(series_b)
+        if n == 0 or m == 0:
+            raise ValueError(
+                f"Both series must be non-empty, got lengths {n} and {m}"
+            )
         cost = self._accumulated_cost(series_a, series_b)
         path = self._backtrack(cost)
         lag = self._compute_lag(path)
@@ -89,9 +96,17 @@ class DTWAligner:
         n, m = len(a), len(b)
         cost = np.full((n, m), np.inf, dtype=np.float64)
         cost[0, 0] = self._distance(a[0], b[0])
-
         w = self._cfg.window or max(n, m)
 
+        # Fill row 0 (top boundary) — pure deletions along reference axis
+        for j in range(1, min(m, w + 1)):
+            cost[0, j] = self._distance(a[0], b[j]) + cost[0, j - 1]
+
+        # Fill column 0 (left boundary) — pure insertions along query axis
+        for i in range(1, min(n, w + 1)):
+            cost[i, 0] = self._distance(a[i], b[0]) + cost[i - 1, 0]
+
+        # DP over the remaining cells within the Sakoe-Chiba band
         for i in range(1, n):
             j_start = max(1, i - w)
             j_end = min(m, i + w + 1)

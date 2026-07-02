@@ -24,6 +24,8 @@ class PhysicsDetectorConfig:
     dp_nominal: Tuple[float, float] = (0.5, 2.0)  # bar — top-bottom ΔP
     reflux_ratio_nominal: Tuple[float, float] = (2.5, 6.0)  # L/D
     temp_gradient_nominal: Tuple[float, float] = (-5.0, -1.0)  # °C/stage
+    flow_nominal: float = 50.0  # L/min — nominal feed flow
+    dp_max: float = 2.0  # bar — nominal dp upper bound for flooding index
 
     # Tolerances (how many standard deviations before flagging)
     n_sigma: float = 3.0
@@ -129,18 +131,16 @@ class PhysicsInformedDetector:
             return 0.0
         return (value - center) / half_span
 
-    @staticmethod
-    def _flooding_index(features: Dict[str, float]) -> float:
+    def _flooding_index(self, features: Dict[str, float]) -> float:
         """Empirical flooding precursor indicator.
 
         High ΔP combined with low (or falling) flow rate is a classic
         sign of incipient flooding in a packed distillation column.
         """
         dp = features.get("dp", 1.0)
-        flow = features.get("flow_rate", 50.0)
-        # Normalised: high dp + low flow → high index
-        dp_norm = dp / 2.0  # divide by nominal max
-        flow_norm = flow / 50.0  # divide by nominal
+        flow = features.get("flow_rate", self.config.flow_nominal)
+        dp_norm = dp / self.config.dp_max
+        flow_norm = flow / self.config.flow_nominal
         if flow_norm < 0.01:
             flow_norm = 0.01
         return dp_norm / flow_norm - 1.0
