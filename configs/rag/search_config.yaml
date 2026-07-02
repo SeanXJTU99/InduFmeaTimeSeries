@@ -1,0 +1,26 @@
+# Hybrid search configuration for the RAG pipeline
+# All values are fictitious — see docs/data_notice.md
+
+hybrid_search:
+  dense_weight: 0.6       # BGE dense retrieval weight in RRF fusion
+  sparse_weight: 0.4      # BM25 keyword retrieval weight
+  top_k_dense: 50         # dense candidate pool size
+  top_k_sparse: 50        # BM25 candidate pool size
+  final_top_k: 10         # number of results after fusion
+  rrf_k: 60               # reciprocal rank fusion smoothing constant
+
+reranker:
+  model_name: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+  top_k_input: 20         # candidates to feed into the cross-encoder
+  top_k_output: 5         # final results after reranking
+  batch_size: 16
+
+embedder:
+  model_name: "BAAI/bge-large-en-v1.5"
+  normalize: true
+  query_prefix: "Represent this sentence for searching relevant passages: "
+
+# Metadata filter defaults — applied before dense+sparse search
+metadata_filter:
+  enabled: true
+  default_mode: "all"     # 'all' (AND) or 'any' (OR)

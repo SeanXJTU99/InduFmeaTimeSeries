@@ -1,0 +1,25 @@
+# Chunking rules for FMEA documents
+# All values are fictitious — see docs/data_notice.md
+
+# Declarative (row-based) chunking — one chunk per FMEA row
+declarative:
+  max_chars_per_chunk: 1500   # soft cap; chunks exceeding this are split
+  chunk_overlap_chars: 100    # overlap for split chunks
+
+# Narrative (heading-based) chunking — for manuals, SOPs, reports
+narrative:
+  heading_levels: [1, 2, 3]   # split on #, ##, ###
+  min_chunk_chars: 50         # discard chunks shorter than this
+  max_chunk_chars: 2000       # soft cap
+
+# Semantic rewriting template (fields are filled from FMEA columns)
+rewrite_template:
+  format: |
+    In system/equipment [{system}], monitoring tag [{tag}],
+    the potential failure mode is: [{failure_mode}].
+    The failure effect (consequence) is: [{effect}],
+    with severity score S={severity}.
+    The potential root cause is: [{cause}].
+    Current controls or time-series anomaly signature: [{controls}].
+    Detection score D={detection}.
+    Overall RPN = {rpn}.
