@@ -1,0 +1,41 @@
+# LangGraph agent graph configuration
+# All values are fictitious — see docs/data_notice.md
+
+graph:
+  max_tokens: 4000            # context window token ceiling
+  confidence_threshold: 0.60  # below this → system fallback
+  max_fmea_matches: 5         # max entries to include in report
+  retry_on_feedback: false    # re-enter graph after reflection
+
+context:
+  trim:
+    chars_per_token_en: 4.0
+    chars_per_token_cn: 2.0
+    keep_last_n_messages: 5
+    summarise_on_trim: true
+
+  summarize:
+    max_summary_chars: 800
+
+nodes:
+  context_resolver:
+    simulate_search: true   # use deterministic FMEA simulation (prod: false)
+
+  fmea_reasoner:
+    min_confidence: 0.60
+    rank_by: "confidence_times_severity"  # or "rpn" or "confidence"
+
+  report_generator:
+    include_citations: true
+    guardrails_enabled: true
+
+  reflection:
+    capture_feedback: true
+    max_feedback_length: 500
+
+  system_fallback:
+    log_incidents: true
+
+routing:
+  intent_classifier:
+    method: "keyword"  # 'keyword' or 'llm_few_shot'
