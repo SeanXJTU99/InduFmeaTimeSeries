@@ -1,0 +1,61 @@
+# Docker Compose — Industrial FMEA Agent (edge + server)
+# All hostnames, ports, and paths are fictitious.
+
+version: "3.9"
+
+services:
+  # Edge inference on Jetson AGX Orin (vLLM + TensorRT-LLM + AWQ)
+  fmea-edge:
+    build:
+      context: .
+      dockerfile: Dockerfile.edge
+    container_name: fmea-edge-orin
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    devices:
+      - /dev/ttyTHS0:/dev/ttyTHS0  # serial port
+    volumes:
+      - ./checkpoints:/app/checkpoints:ro
+      - ./configs:/app/configs:ro
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - VLLM_MODEL_PATH=/app/checkpoints/fmea-awq-int4
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Server-side LangGraph agent + RAG + RL sandbox (L40S)
+  fmea-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: fmea-server-l40s
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+      - "8002:8000"  # vLLM API
+    volumes:
+      - ./src:/app/src:ro
+      - ./configs:/app/configs:ro
+      - ./checkpoints:/app/checkpoints:ro
+      - ./data:/app/data:ro
+    environment:
+      - CUDA_VISIBLE_DEVICES=0,1
+      - LANGGRAPH_CHECKPOINT_DB=/app/data/checkpoints.db
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 2
+              capabilities: [gpu]
+    depends_on:
+      fmea-edge:
+        condition: service_healthy
+
+networks:
+  default:
+    name: fmea-industrial-net
