@@ -1,0 +1,62 @@
+# LoRA / QLoRA training configuration
+# All values are fictitious — see docs/data_notice.md
+
+# --- Model ---
+model:
+  base: "Qwen/Qwen2.5-7B-Instruct"
+  trust_remote_code: true
+  use_flash_attention_2: true
+
+# --- LoRA ---
+lora:
+  r: 64
+  alpha: 128
+  dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+  bias: "none"
+  task_type: "CAUSAL_LM"
+
+# --- Quantization (4-bit NF4) ---
+quantization:
+  load_in_4bit: true
+  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_use_double_quant: true
+
+# --- SFT Training ---
+sft:
+  dataset: "data/sft_dataset.jsonl"
+  output_dir: "checkpoints/qlora-fmea"
+  num_epochs: 3
+  per_device_batch_size: 4
+  gradient_accumulation_steps: 8
+  learning_rate: 2.0e-4
+  warmup_ratio: 0.03
+  lr_scheduler: "cosine"
+  optim: "paged_adamw_8bit"
+  max_seq_length: 2048
+  logging_steps: 10
+  save_steps: 500
+  fp16: true
+
+# --- DPO Training ---
+dpo:
+  dataset: "data/dpo_dataset.jsonl"
+  sft_checkpoint: "checkpoints/qlora-fmea"
+  output_dir: "checkpoints/dpo-fmea"
+  beta: 0.1
+  loss_type: "sigmoid"
+  num_epochs: 1
+  per_device_batch_size: 2
+  gradient_accumulation_steps: 16
+  learning_rate: 5.0e-5
+  warmup_ratio: 0.1
+  max_seq_length: 2048
+  max_prompt_length: 1024

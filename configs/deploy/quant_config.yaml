@@ -1,0 +1,22 @@
+# AWQ / GPTQ quantization configuration
+# All values are fictitious — see docs/data_notice.md
+
+quantization:
+  method: "awq"              # 'awq' or 'gptq'
+  bits: 4                    # INT4
+  group_size: 128
+  zero_point: true           # asymmetric quantization
+  version: "gemm"            # 'gemm' or 'gemv' kernel
+
+calibration:
+  dataset: "data/sft_dataset.jsonl"
+  num_samples: 128
+  seq_length: 2048
+
+input:
+  merged_model: "checkpoints/fmea-merged"
+  trust_remote_code: true
+
+output:
+  quantized_model: "checkpoints/fmea-awq-int4"
+  format: "vllm"             # vLLM-compatible serialisation

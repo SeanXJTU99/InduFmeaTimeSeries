@@ -1,0 +1,26 @@
+# TensorRT-LLM configuration (Jetson AGX Orin edge)
+# All values are fictitious — see docs/data_notice.md
+
+model:
+  path: "checkpoints/fmea-awq-int4"
+  quantization: "int4_awq"
+  dtype: "float16"
+
+build:
+  max_batch_size: 8
+  max_input_len: 2048
+  max_output_len: 1024
+  max_beam_width: 1
+  use_gpt_attention_plugin: true
+  use_gemm_plugin: true
+  enable_context_fmha: true
+  remove_input_padding: true
+
+runtime:
+  gpu_weights_percent: 1.0
+  enable_trt_overlap: true
+  kv_cache_free_gpu_mem_fraction: 0.40
+  executor_config:
+    max_beam_width: 1
+    scheduler_config:
+      capacity_scheduler_policy: "MAX_UTILIZATION"

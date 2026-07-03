@@ -1,0 +1,25 @@
+# vLLM serving configuration (L40S server-side)
+# All values are fictitious — see docs/data_notice.md
+
+model:
+  path: "checkpoints/fmea-awq-int4"
+  quantization: "awq"
+  dtype: "float16"
+  trust_remote_code: true
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+  max_model_len: 4096
+  gpu_memory_utilization: 0.90
+  tensor_parallel_size: 1      # set to 2 for dual-GPU
+  pipeline_parallel_size: 1
+
+scheduler:
+  max_num_seqs: 64
+  max_num_batched_tokens: 4096
+  enable_prefix_caching: true
+
+api:
+  enable_openai_api: true
+  api_key: null                  # none for internal-only deployment

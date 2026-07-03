@@ -1,0 +1,38 @@
+# Dockerfile for Jetson AGX Orin edge deployment
+# Uses NVIDIA L4T base image with JetPack 6.x
+# All paths are fictitious
+
+FROM nvcr.io/nvidia/l4t-base:r36.3.0
+
+LABEL description="Industrial FMEA Agent — Edge (Jetson AGX Orin)"
+LABEL component="vLLM + TensorRT-LLM + AWQ INT4 inference"
+
+# System dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.10 python3.10-dev python3-pip \
+    libopenblas-dev libopenmpi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir \
+    tensorrt-llm==0.12.0 \
+    --extra-index-url https://pypi.nvidia.com
+
+# Model and configs
+COPY checkpoints/fmea-awq-int4 ./checkpoints/fmea-awq-int4
+COPY src/deploy/ ./src/deploy/
+COPY configs/ ./configs/
+
+# DMA device access
+RUN usermod -a -G dialout root
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+CMD ["bash", "src/deploy/jetson_deploy.sh"]

@@ -1,0 +1,40 @@
+# Dockerfile for L40S server-side deployment
+# Central AI server hosting LangGraph Agent + RAG + RL sandbox
+# All paths are fictitious
+
+FROM nvidia/cuda:12.4.0-runtime-ubuntu22.04
+
+LABEL description="Industrial FMEA Agent — Server (L40S)"
+LABEL component="LangGraph + RAG + RL Sandbox"
+
+ENV PYTHONUNBUFFERED=1
+ENV DEBIAN_FRONTEND=noninteractive
+
+# System dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.10 python3.10-dev python3-pip \
+    git curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir vllm>=0.5.0
+
+# Application code
+COPY src/ ./src/
+COPY configs/ ./configs/
+COPY checkpoints/ ./checkpoints/
+COPY data/ ./data/
+
+# vLLM inference server
+EXPOSE 8000
+# LangGraph agent API
+EXPOSE 8001
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:8001/health || exit 1
+
+CMD ["python", "-m", "src.agent.graph"]
