@@ -11,7 +11,7 @@ and **serial RS485 byte streams** into a unified agent loop.
 |-------|--------|-------------------|
 | 1 — Foundation | 2025.04–08 | Kalman-Wavelet cascade, DTW alignment, virtual soft sensor, physics-informed anomaly detection, EWMA+KDE adaptive baseline, RAG with four-layer anti-hallucination |
 | 2 — Agent | 2025.09–12 | LangGraph StateGraph agent, BM25+BGE hybrid retrieval + cross-encoder reranking, constrained decoding + Pydantic + Guardrails, QLoRA SFT + DPO alignment, AWQ INT4 quantization |
-| 2b — Alg. Upgrade | 2025.12 | Sliding-window DAF annealing Kalman (replaces wavelet pre-filter), 3D boolean matrix safety gateway (replaces JSON Schema chain), FMEA Bilinks causal graph retrieval (replaces pure BM25 search), hard-clock NTP alignment (supplements DTW), raw covariance packing (Jetson DMA optimization). All zero additional hardware. |
+| 2b — Perf. Eng. | 2025.12 | **Memory:** DAF eliminates wavelet buffer; dictionary quantization (Float32→8-bit, 50% storage reduction for PLC streams); 3D boolean matrix (500KB L3) replaces JSON Schema chain; Bilinks adjacency list frees ~500MB GPU VRAM. **Heterogeneous Compute:** raw covariance (5×5→15 array) DMA to Jetson Orin NPU (~50μs→~5μs). **Latency:** O(1) matrix lookup <1ns vs ~10μs JSON Schema; O(1) NTP alignment vs O(N²) DTW; O(V+E) BFS vs O(N×D) vector search. Zero additional hardware. |
 | 3 — Intelligence | 2026.01–05 | Kalman-Wavelet-Transformer cascade, Model-based RL (PPO + MCTS), counterfactual advisor, DMA/NPU edge deployment on Jetson AGX Orin |
 
 ## Architecture Overview

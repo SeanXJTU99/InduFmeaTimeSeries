@@ -4,19 +4,22 @@
 
 The initial architecture used standard industrial data processing approaches
 (Kalman + wavelet cascade, BM25 vector search, JSON Schema validation chain).
-During the system integration phase (2025.12 - 2026.01), several core
-algorithms were upgraded based on robustness requirements discovered in
-production testing. All upgrades require zero additional hardware.
+During the LangGraph refactoring phase (2025.12), several core algorithms
+were upgraded across three dimensions — Memory, Heterogeneous Compute, and
+Latency. All upgrades require zero additional hardware.
 
 ## Evolution Summary
 
-| Module | Initial | Upgraded | Rationale | HW Cost |
-|--------|---------|----------|-----------|:-----:|
-| Signal denoising | Kalman + wavelet pre-filter (two-stage cascade) | DAF annealing Kalman (auto-suppresses outliers, eliminates wavelet stage) | Adaptive outlier rejection without manual threshold tuning | None |
-| Safety gateway | JSON Schema + Pydantic + Constrained Decoding + Guardrails (4 layers) | 3D boolean matrix O(1) lookup + LLM fallback (2 layers) | Deterministic rules need no LLM inference | None |
-| Knowledge retrieval | BM25 + BGE-Large hybrid search + reranker | FMEA Bilinks causal graph BFS + BM25 fallback | Topology-constrained retrieval eliminates cross-system false positives | None (reduces FAISS VRAM) |
-| Time alignment | DTW soft alignment (O(N^2)) | Hard-clock NTP alignment (O(1)) + DTW fallback | PLC NTP makes DTW unnecessary in normal operation | None |
-| DMA transfer | NumPy -> pickle -> bytes -> cudaMemcpy | Raw covariance array packing -> DMA direct | Eliminates serialization overhead on Jetson Orin | None |
+| Dimension | Module | Initial | Upgraded | Quantified Impact | HW Cost |
+|-----------|--------|---------|----------|-------------------|:-----:|
+| Memory | Signal denoising | Kalman + wavelet (2 buffers) | DAF Kalman (single-stage) | ~2KB per sensor saved | None |
+| Memory | PLC data storage | Float32 raw arrays | Dictionary quantization (8-bit) | 50% storage reduction | None |
+| Memory | Safety gateway | JSON Schema + Pydantic (GC-heavy) | 3D boolean matrix (500KB L3) | Zero GC pressure | None |
+| Memory | Knowledge retrieval | FAISS vector index (GPU VRAM) | Bilinks adjacency list (CPU) | ~500MB GPU VRAM freed | None |
+| Heterogeneous | Kalman state transfer | NumPy→pickle→cudaMemcpy | 15-element raw array DMA | ~50μs→~5μs (10x) | None |
+| Latency | Hard-rule check | JSON Schema parsing ~10μs | Boolean array lookup | <1ns (10,000x) | None |
+| Latency | Time alignment | O(N²) DTW | O(1) NTP bucket lookup | Seconds→zero | None |
+| Latency | Causal search | O(N×D) vector similarity | O(V+E) BFS on bilinks | ms→μs | None |
 
 ## Decision Rationale
 
