@@ -259,7 +259,7 @@ def compute_annealing_schedule(
 # =============================================================================
 # Sliding-Window Batch DAF
 #
-# The original DAF algorithm (genfit/DAF.cc) operates on multiple measurements
+# The original DAF algorithm operates on multiple measurements
 # jointly: each beta iteration runs a full Kalman fit over ALL measurements,
 # then recomputes Bayesian weights across the entire measurement set. This
 # multi-measurement joint fitting is the core advantage of DAF — measurements
@@ -407,7 +407,7 @@ class SlidingWindowDAF:
     def _run_batch_daf(self) -> WindowDAFResult:
         """Run full batch DAF on the current window.
 
-        Implements the original DAF algorithm (genfit/DAF.cc processTrackWithRep):
+        Implements the original batch DAF algorithm (Fruehwirth & Strandlie, CPC 1999):
         1. For each beta in the annealing schedule:
            a. Run a full Kalman pass over all window measurements
            b. Compute Bayesian weights for all measurements
@@ -513,9 +513,9 @@ class SlidingWindowDAF:
     ) -> list[float]:
         """Compute Bayesian weights for all measurements at current beta.
 
-        Adapted from genfit/DAF.cc calcWeights() — the multi-measurement
-        version where all measurements compete for weight via the shared
-        phi_sum + phi_cut denominator.
+        Implements the multi-measurement Bayesian weight computation
+        (Fruehwirth & Strandlie, CPC 120 (1999) 197-214): all measurements
+        compete for weight via the shared phi_sum + phi_cut denominator.
         """
         cfg = self.config
         d = 1  # scalar measurements
