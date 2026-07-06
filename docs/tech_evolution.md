@@ -23,10 +23,13 @@ production testing. All upgrades require zero additional hardware.
 ### 1. DAF replaces standard Kalman
 
 Standard Kalman requires wavelet pre-filtering with manually-set thresholds
-to remove high-frequency sensor noise. The DAF's annealing mechanism computes
-Bayesian weights internally during the Kalman update — outlier measurements
-naturally receive near-zero weights without a separate preprocessing stage.
-This simplifies the signal pipeline's maintenance burden.
+to remove high-frequency sensor noise. The DAF operates on a sliding window
+of buffered measurements: each beta iteration runs a full Kalman pass over
+all windowed measurements, then recomputes Bayesian weights jointly across
+the entire set. The phi_cut penalty term distributes weight competitively —
+outlier measurements naturally receive near-zero weights without a separate
+preprocessing stage. Between batch DAF passes, real-time updates use standard
+Kalman. Window size is configurable (default 32, 50% overlap via step_size=16).
 
 ### 2. 3D matrix replaces JSON Schema chain
 

@@ -148,17 +148,25 @@ class FMEABilinksGraph:
             mt = row.get("mitigation", "")
             severity = row.get("severity", 1)
 
+            # Skip rows with empty mandatory fields to avoid meaningless nodes
+            if not tag or not fm:
+                continue
+
             sensor_id = self._get_or_create("sensor", tag, system, row)
             fm_id = self._get_or_create("failure_mode", fm, system, row)
-            rc_id = self._get_or_create("root_cause", rc, system, row)
-            mt_id = self._get_or_create("mitigation", mt, system, row)
 
             self.add_bilink(sensor_id, fm_id, "observes", weight=severity / 10.0)
             bilink_count += 1
-            self.add_bilink(fm_id, rc_id, "caused_by", weight=0.9)
-            bilink_count += 1
-            self.add_bilink(rc_id, mt_id, "mitigated_by", weight=0.8)
-            bilink_count += 1
+
+            if rc:
+                rc_id = self._get_or_create("root_cause", rc, system, row)
+                self.add_bilink(fm_id, rc_id, "caused_by", weight=0.9)
+                bilink_count += 1
+
+                if mt:
+                    mt_id = self._get_or_create("mitigation", mt, system, row)
+                    self.add_bilink(rc_id, mt_id, "mitigated_by", weight=0.8)
+                    bilink_count += 1
 
         return bilink_count
 
