@@ -1,4 +1,4 @@
-"""Two-stage Kalman filter for industrial PLC signal denoising.
+"""Two-stage Kalman filter for industrial signal denoising.
 
 Stage 1: sensor-level electromagnetic interference filtering.
 Stage 2: physics-informed state prediction with process model constraints.
