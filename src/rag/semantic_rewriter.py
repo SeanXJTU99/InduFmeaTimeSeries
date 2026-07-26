@@ -96,9 +96,9 @@ class SemanticRewriter:
     @staticmethod
     def _is_header(cells: List[str]) -> bool:
         """Heuristic: does this row look like an FMEA table header?"""
-        keywords = {"失效", "failure", "mode", "severity", "cause", "effect", "S", "O", "D"}
+        keywords = {"failure", "mode", "severity", "cause", "effect", "controls", "detection"}
         joined = " ".join(cells).lower()
-        return any(kw.lower() in joined for kw in keywords)
+        return any(kw in joined for kw in keywords)
 
     @staticmethod
     def _get(row: Dict[str, str], *keys: str, default: str = "N/A") -> str:
@@ -122,15 +122,15 @@ class SemanticRewriter:
             return 0
 
     def _rewrite_row(self, row: Dict[str, str]) -> Dict[str, Any]:
-        system = self._get(row, "系统/设备", "System", "system", default="Unspecified")
-        tag = self._get(row, "测点", "Tag", "tag", "对应测点", default="N/A")
-        fm = self._get(row, "潜在失效模式", "Failure Mode", "failure_mode", default="N/A")
-        effect = self._get(row, "潜在失效后果", "Effect", "effect", "潜在失效影响", default="N/A")
-        cause = self._get(row, "潜在失效起因", "Cause", "cause", "潜在失效原因", default="N/A")
-        controls = self._get(row, "现行控制", "Controls", "controls", "现行控制/时序异常表现", default="N/A")
-        severity = self._safe_int(row, "S", "severity", "严重度")
-        occurrence = self._safe_int(row, "O", "occurrence", "频度")
-        detection = self._safe_int(row, "D", "detection", "探测度")
+        system = self._get(row, "system", default="Unspecified")
+        tag = self._get(row, "tag", default="N/A")
+        fm = self._get(row, "failure_mode", default="N/A")
+        effect = self._get(row, "effect", default="N/A")
+        cause = self._get(row, "cause", default="N/A")
+        controls = self._get(row, "controls", default="N/A")
+        severity = self._safe_int(row, "severity")
+        occurrence = self._safe_int(row, "occurrence")
+        detection = self._safe_int(row, "detection")
         rpn = severity * occurrence * detection
 
         page_content = FMEA_TEMPLATE.format(

@@ -1,6 +1,6 @@
 """Hybrid search: BM25 keyword retrieval + BGE dense vector retrieval.
 
-Industrial terminology includes precise nouns ("汽蚀", "flooding",
+Industrial terminology includes precise nouns ("cavitation", "flooding",
 "FV-301") that pure dense retrieval can miss.  BM25 catches exact
 tag/part-number matches while BGE captures semantic intent.  Results
 are merged via reciprocal rank fusion (RRF).

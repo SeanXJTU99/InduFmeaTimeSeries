@@ -115,7 +115,7 @@ class TrimManager:
     def _estimate_tokens(self, text: str) -> int:
         """Rough heuristic: count CJK characters as 0.5 tokens,
         ASCII as 0.25 tokens."""
-        cjk = sum(1 for c in text if "一" <= c <= "鿿")
+        cjk = sum(1 for c in text if '一' <= c <= '鿿')
         ascii_chars = len(text) - cjk
         return int(cjk / self._cfg.chars_per_token_cn + ascii_chars / self._cfg.chars_per_token_en)
 
