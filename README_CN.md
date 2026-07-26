@@ -1,5 +1,16 @@
 # 工业 FMEA Agent — 多级低温精馏智能化诊断系统
 
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://python.org)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-ee4c2c)](https://pytorch.org)
+[![CUDA](https://img.shields.io/badge/CUDA-12.4-76b900)](https://developer.nvidia.com/cuda-toolkit)
+[![Triton](https://img.shields.io/badge/Triton-Kernel-6f42c1)](https://triton-lang.org)
+[![vLLM](https://img.shields.io/badge/vLLM-0.5%2B-00b2a9)](https://github.com/vllm-project/vllm)
+[![TensorRT-LLM](https://img.shields.io/badge/TensorRT--LLM-0.12-76b900)](https://github.com/NVIDIA/TensorRT-LLM)
+[![Jetson](https://img.shields.io/badge/Jetson-AGX%20Orin-76b900)](https://developer.nvidia.com/embedded/jetson-agx-orin)
+[![LangGraph](https://img.shields.io/badge/LangGraph-Agent-ff6f00)](https://github.com/langchain-ai/langgraph)
+[![AWQ](https://img.shields.io/badge/Quant-AWQ%20INT4-8b5cf6)](https://github.com/mit-han-lab/llm-awq)
+[![License](https://img.shields.io/badge/License-Proprietary-red)]()
+
 面向同位素富集用多级低温精馏设备的 AI 预测性维护与 FMEA 系统。
 集成 **西门子 PLC 实时流**、**异步 Excel 同位素丰度报表**、
 **串口 RS485 字节流**，统一纳入 Agent 闭环。

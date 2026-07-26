@@ -1,5 +1,16 @@
 # Industrial FMEA Agent — Multi-Stage Cryogenic Distillation Intelligent Diagnostics
 
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://python.org)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-ee4c2c)](https://pytorch.org)
+[![CUDA](https://img.shields.io/badge/CUDA-12.4-76b900)](https://developer.nvidia.com/cuda-toolkit)
+[![Triton](https://img.shields.io/badge/Triton-Kernel-6f42c1)](https://triton-lang.org)
+[![vLLM](https://img.shields.io/badge/vLLM-0.5%2B-00b2a9)](https://github.com/vllm-project/vllm)
+[![TensorRT-LLM](https://img.shields.io/badge/TensorRT--LLM-0.12-76b900)](https://github.com/NVIDIA/TensorRT-LLM)
+[![Jetson](https://img.shields.io/badge/Jetson-AGX%20Orin-76b900)](https://developer.nvidia.com/embedded/jetson-agx-orin)
+[![LangGraph](https://img.shields.io/badge/LangGraph-Agent-ff6f00)](https://github.com/langchain-ai/langgraph)
+[![AWQ](https://img.shields.io/badge/Quant-AWQ%20INT4-8b5cf6)](https://github.com/mit-han-lab/llm-awq)
+[![License](https://img.shields.io/badge/License-Proprietary-red)]()
+
 AI-powered predictive maintenance and FMEA (Failure Mode and Effects Analysis)
 system for multi-stage cryogenic distillation equipment used in isotope enrichment.
 Integrates **Siemens PLC real-time streams**, **async Excel isotope abundance reports**,
