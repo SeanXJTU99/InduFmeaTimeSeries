@@ -5,6 +5,8 @@ system for multi-stage cryogenic distillation equipment used in isotope enrichme
 Integrates **Siemens PLC real-time streams**, **async Excel isotope abundance reports**,
 and **serial RS485 byte streams** into a unified agent loop.
 
+[中文版](README_CN.md)
+
 ## Three-Phase Evolution (2025.04 – 2026.05)
 
 | Phase | Period | Core Technologies |
