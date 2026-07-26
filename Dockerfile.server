@@ -37,4 +37,5 @@ EXPOSE 8001
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
     CMD curl -f http://localhost:8001/health || exit 1
 
-CMD ["python", "-m", "src.agent.graph"]
+# Start vLLM server, then warm up the prefix cache
+CMD ["bash", "-c", "python -m vllm.entrypoints.openai.api_server --config src/deploy/vllm_config.yaml & sleep 10 && python src/deploy/vllm_warmup.py && wait"]

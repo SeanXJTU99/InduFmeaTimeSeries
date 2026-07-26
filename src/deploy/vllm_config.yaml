@@ -12,14 +12,41 @@ server:
   port: 8000
   max_model_len: 4096
   gpu_memory_utilization: 0.90
-  tensor_parallel_size: 1      # set to 2 for dual-GPU
+  tensor_parallel_size: 1
   pipeline_parallel_size: 1
 
 scheduler:
   max_num_seqs: 64
   max_num_batched_tokens: 4096
-  enable_prefix_caching: true
+  enable_prefix_caching: true     # shared system-prompt KV reused across all FMEA requests
+  enable_chunked_prefill: true    # split long prefill into chunks for better scheduling
+
+# ---- Speculative Decoding ----
+# A 0.5B draft model proposes tokens; the 7B main model verifies.
+# FMEA JSON outputs have low entropy → high acceptance rate (~85%).
+speculative:
+  enabled: false                   # set to true after building the draft model
+  draft_model: "checkpoints/fmea-draft-int4"
+  draft_quantization: "awq"
+  num_speculative_tokens: 5       # draft 5 tokens ahead per step
+  method: "ngram"                 # 'ngram' (no extra model) or 'draft_model'
+
+# ---- Prefix Cache Warmup ----
+# System prompt (~800 tokens: topology + safety rules) is shared across
+# all FMEA queries.  Pre-computing its KV cache once eliminates prompt
+# encoding latency for every subsequent request.
+warmup:
+  enabled: true
+  warmup_prompts:
+    - role: "system"
+      content: |
+        You are a conservative industrial FMEA diagnostic agent for a
+        multi-stage cryogenic distillation system.  Rules: (1) only use
+        provided FMEA context and topology; (2) cite every claim with
+        [Source: <id>]; (3) if confidence < 0.6, state "Manual inspection
+        required"; (4) never recommend irreversible actions without
+        operator confirmation; (5) abundance values must be in [0,100]%.
 
 api:
   enable_openai_api: true
-  api_key: null                  # none for internal-only deployment
+  api_key: null                    # none for internal-only deployment

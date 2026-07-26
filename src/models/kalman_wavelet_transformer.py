@@ -39,6 +39,7 @@ class KWTConfig:
     d_ff: int = 2048
     dropout: float = 0.1
     activation: str = "gelu"
+    use_flash_attention: bool = True  # PyTorch 2.0+ SDPA Flash Attention backend
 
     # Kalman feedback
     kalman_q: float = 1e-4
@@ -72,7 +73,8 @@ class KWTransformer(nn.Module):
         )
         self.embedding = MultiScaleEmbedding(emb_cfg)
 
-        # Transformer encoder
+        # Transformer encoder with Flash Attention (PyTorch 2.0+ sdpa)
+        self._use_flash_attn = cfg.use_flash_attention
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=cfg.d_model,
             nhead=cfg.n_heads,
@@ -125,8 +127,14 @@ class KWTransformer(nn.Module):
         # 1. Multi-scale embedding
         emb = self.embedding(plc_signals)  # (B, T, d_model)
 
-        # 2. Transformer encoder
-        encoded = self.encoder(emb)  # (B, T, d_model)
+        # 2. Transformer encoder (Flash Attention via PyTorch 2.0+ SDPA)
+        if self._use_flash_attn and torch.cuda.is_available():
+            with torch.backends.cuda.sdp_kernel(
+                enable_flash=True, enable_math=False, enable_mem_efficient=False,
+            ):
+                encoded = self.encoder(emb)  # (B, T, d_model)
+        else:
+            encoded = self.encoder(emb)  # (B, T, d_model)
 
         # 3. Pool over time dimension
         pooled = encoded.mean(dim=1)  # (B, d_model)
