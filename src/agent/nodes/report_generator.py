@@ -1,7 +1,7 @@
 """Report generator node — assembles the final FMEA diagnostic report.
 
 Takes the ranked FMEA matches from the reasoner and produces:
-1. A structured JSON diagnostic report.
+1. A structured JSON diagnostic report (xgrammar FSM-accelerated when available).
 2. A human-readable summary for the SCADA/MES operator console.
 3. Passes the report through the Guardrails gateway before output.
 
