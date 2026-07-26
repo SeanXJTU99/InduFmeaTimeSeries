@@ -22,14 +22,20 @@ scheduler:
   enable_chunked_prefill: true    # split long prefill into chunks for better scheduling
 
 # ---- Speculative Decoding ----
-# A 0.5B draft model proposes tokens; the 7B main model verifies.
-# FMEA JSON outputs have low entropy → high acceptance rate (~85%).
+# ngram mode: zero-setup — vLLM auto-matches n-grams from prompt context.
+# FMEA JSON outputs have repetitive structure (keys, failure_mode enum, etc.)
+# → high n-gram hit rate without any extra model.
+# draft_model mode: 0.5B Qwen2.5 draft → ~85% acceptance → 2-3x TTFT reduction.
 speculative:
-  enabled: false                   # set to true after building the draft model
+  enabled: true
+  method: "ngram"                   # 'ngram' (zero-setup) or 'draft_model' (needs GPU build)
+  num_speculative_tokens: 5
+  ngram_prompt_lookup_max: 4        # n-gram window size
+  ngram_prompt_lookup_min: 2
+  # draft-model settings (used only when method='draft_model'):
   draft_model: "checkpoints/fmea-draft-int4"
   draft_quantization: "awq"
-  num_speculative_tokens: 5       # draft 5 tokens ahead per step
-  method: "ngram"                 # 'ngram' (no extra model) or 'draft_model'
+  draft_tensor_parallel_size: 1
 
 # ---- Prefix Cache Warmup ----
 # System prompt (~800 tokens: topology + safety rules) is shared across

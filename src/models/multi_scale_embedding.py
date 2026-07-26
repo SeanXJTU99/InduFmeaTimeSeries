@@ -66,10 +66,23 @@ class MultiScaleEmbedding(nn.Module):
         Returns:
             (batch, seq_len, d_model) with positional encoding added.
         """
-        # In production, wavelet decomposition happens on the input tensor.
-        # For the portfolio demo, we assume the input is pre-processed
-        # multi-scale features from src/signal/.
-        batch, seq_len, _ = x.shape
+        seq_len = x.shape[1]
+
+        # Attempt Triton fused kernel (linear + pos_encoding + dropout)
+        try:
+            from src.models.kwt_triton_kernel import kwt_fused_embed
+            return kwt_fused_embed(
+                x,
+                self.input_proj.weight,
+                self.input_proj.bias,
+                self.pos_encoding,
+                dropout_p=self._cfg.dropout,
+                training=self.training,
+            )
+        except (ImportError, Exception):
+            pass
+
+        # Fallback: standard PyTorch path
         projected = self.input_proj(x)
         projected = projected + self.pos_encoding[:seq_len, :]
         return self.dropout(projected)
