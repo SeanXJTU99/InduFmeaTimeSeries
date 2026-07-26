@@ -89,6 +89,10 @@ def allocate_dma_buffer(size: int, alignment: int = 64) -> np.ndarray:
 
     Jetson DMA engine requires 64-byte alignment for optimal throughput.
 
+    NOTE: On Jetson Orin, prefer ``cudaHostAlloc`` with ``cudaHostAllocMapped``
+    for true page-locked DMA memory.  The ``ctypes`` fallback below works
+    on x86 test benches but may not guarantee alignment on all platforms.
+
     Args:
         size: Number of float32 elements.
         alignment: Byte alignment (default 64).
@@ -126,6 +130,6 @@ def prepare_kalman_dma_packet(
     packet = np.empty(22, dtype=np.float32)
     packet[0:5] = state.astype(np.float32)
     packet[5:20] = pack_covariance_5x5(covariance.astype(np.float32))
-    packet[20] = np.float32(time.time())
+    packet[20] = np.float64(time.time())  # float64 preserves microsecond precision
     packet[21] = np.float32(0.0)
     return packet

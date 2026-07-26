@@ -37,5 +37,17 @@ EXPOSE 8001
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
     CMD curl -f http://localhost:8001/health || exit 1
 
-# Start vLLM server, then warm up the prefix cache
-CMD ["bash", "-c", "python -m vllm.entrypoints.openai.api_server --config src/deploy/vllm_config.yaml & sleep 10 && python src/deploy/vllm_warmup.py && wait"]
+# Start vLLM server with CLI flags (vLLM does not accept YAML configs natively).
+# Wait for model to finish loading before warmup (AWQ 7B ~15-30s on L40S).
+CMD ["bash", "-c", "\
+  python -m vllm.entrypoints.openai.api_server \
+    --model checkpoints/fmea-awq-int4 \
+    --quantization awq \
+    --dtype float16 \
+    --max-model-len 4096 \
+    --gpu-memory-utilization 0.90 \
+    --enable-prefix-caching \
+    --enable-chunked-prefill \
+    --speculative-config '{\"method\":\"ngram\",\"num_speculative_tokens\":5}' \
+    --port 8000 & \
+  sleep 20 && python src/deploy/vllm_warmup.py && wait"

@@ -55,8 +55,6 @@ class XGrammarCompiler:
                 "xgrammar is not installed. Install with: "
                 "pip install xgrammar  (requires Python 3.10+)"
             )
-        import xgrammar
-        self._tokenizer_info: object | None = None
         self._compiled: object | None = None
 
     def compile(

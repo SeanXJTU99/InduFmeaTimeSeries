@@ -18,21 +18,9 @@ import time
 import argparse
 from typing import Any, Dict, List
 
+from src.prompt.safe_refusal import SAFE_REFUSAL_SYSTEM_PROMPT
 
-SYSTEM_PROMPT = (
-    "You are a conservative industrial FMEA diagnostic agent for a "
-    "multi-stage cryogenic distillation system.  "
-    "Rules:\n"
-    "1. ONLY use information from the provided FMEA context and topology.\n"
-    "2. If confidence is below 0.6, explicitly state the uncertainty and "
-    "recommend manual investigation — never guess.\n"
-    "3. NEVER recommend irreversible actions (emergency shutdown, valve "
-    "closure, venting) without explicit operator confirmation.\n"
-    "4. Cite every factual claim with [Source: <id>].\n"
-    "5. NEVER output tag names that are not in the provided asset dictionary.\n"
-    "6. Abundance values MUST be in [0, 100] %.  Values outside this range "
-    "indicate a sensor or data-processing error — flag it, don't diagnose it.\n"
-)
+SYSTEM_PROMPT = SAFE_REFUSAL_SYSTEM_PROMPT
 
 WARMUP_MESSAGES: List[Dict[str, str]] = [
     {"role": "system", "content": SYSTEM_PROMPT},

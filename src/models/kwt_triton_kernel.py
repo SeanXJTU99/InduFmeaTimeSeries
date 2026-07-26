@@ -19,7 +19,6 @@ Usage:
 from __future__ import annotations
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 # ---------------------------------------------------------------------------
@@ -68,12 +67,13 @@ if _has_triton():
     def _kwt_fused_kernel(
         x_ptr,          # (B, T, C) input
         w_ptr,          # (D, C) weight
-        b_ptr,          # (D,) bias — may be null
+        b_ptr,          # (D,) bias — may be garbage if HAS_BIAS=False
         pe_ptr,         # (T, D) positional encoding
         out_ptr,        # (B, T, D) output
         B: int, T: int, C: int, D: int,
         DROPOUT_P: float,
         SEED: int,
+        HAS_BIAS: tl.constexpr,
         BLOCK_D: tl.constexpr,
         BLOCK_C: tl.constexpr,
     ):
@@ -108,8 +108,8 @@ if _has_triton():
 
             acc += tl.sum(w_val * x_val[None, :], axis=1)
 
-        # Add bias
-        if b_ptr is not None:  # triton supports constexpr branches
+        # Add bias (compile-time guard — avoids loading from garbage pointer)
+        if HAS_BIAS:
             b_val = tl.load(b_ptr + d_offs, mask=d_mask, other=0.0).to(tl.float32)
             acc += b_val
 
@@ -162,15 +162,17 @@ if _has_triton():
         grid = (B * T, triton.cdiv(D, BLOCK_D))
 
         seed = torch.randint(0, 2**31 - 1, (1,), device="cpu").item() if training and dropout_p > 0 else 0
+        has_bias = bias is not None
 
         _kwt_fused_kernel[grid](
             x, weight,
-            bias if bias is not None else x.new_empty(0),  # null pointer sentinel
+            bias if has_bias else x.new_empty(0),
             pos_encoding,
             out,
             B, T, C, D,
             float(dropout_p) if training else 0.0,
             seed,
+            HAS_BIAS=has_bias,
             BLOCK_D=BLOCK_D,
             BLOCK_C=BLOCK_C,
         )

@@ -78,7 +78,7 @@ class FMEABilinksGraph:
 
     def __init__(self):
         self.nodes: dict[int, BilinkNode] = {}
-        self._tag_index: dict[str, int] = {}
+        self._tag_index: dict[tuple[str, str], int] = {}  # (tag, system) → node_id
         self._adjacency: dict[int, list[Bilink]] = {}
         self._next_id: int = 0
 
@@ -103,7 +103,7 @@ class FMEABilinksGraph:
             system=system,
             metadata=metadata or {},
         )
-        self._tag_index[tag] = node_id
+        self._tag_index[(tag, system)] = node_id
         self._adjacency.setdefault(node_id, [])
         return node_id
 
@@ -173,8 +173,9 @@ class FMEABilinksGraph:
     def _get_or_create(
         self, node_type: str, tag: str, system: str, metadata: dict
     ) -> int:
-        if tag in self._tag_index:
-            return self._tag_index[tag]
+        key = (tag, system)
+        if key in self._tag_index:
+            return self._tag_index[key]
         return self.add_node(node_type, tag, system, metadata)
 
     #
@@ -198,10 +199,14 @@ class FMEABilinksGraph:
             List of dicts with node info and bfs_depth. Empty list if the
             seed tag is unknown (caller should fall back to BM25).
         """
-        if seed_tag not in self._tag_index:
+        # Search all systems for the seed tag (tag is not globally unique)
+        matching = [
+            node_id for (t, _), node_id in self._tag_index.items() if t == seed_tag
+        ]
+        if not matching:
             return []
 
-        seed_id = self._tag_index[seed_tag]
+        seed_id = matching[0]  # prefer first match; multi-system ambiguity is rare
         visited: set[int] = {seed_id}
         queue: deque[tuple[int, int]] = deque([(seed_id, 0)])
         results: list[dict] = []

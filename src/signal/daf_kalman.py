@@ -115,6 +115,11 @@ class DAFKalmanFilter:
             (updated_state, is_outlier): Updated Kalman state and whether
             this measurement was classified as an outlier.
         """
+        if not isinstance(kalman_state, KalmanState):
+            raise TypeError(
+                f"kalman_state must be KalmanState, got {type(kalman_state).__name__}"
+            )
+
         n_measurements = 1  # single-channel update
         daf_states = [DAFState(residual=np.array([0.0]))]
 
@@ -203,8 +208,11 @@ class DAFKalmanFilter:
 
         denom = phi_total + phi_cut
         if denom < 1e-12:
+            # Numerical underflow — assign uniform minimum weight to avoid
+            # rejecting every measurement as an outlier.
+            min_w = 1.0 / max(len(states), 1)
             for state in states:
-                state.weight = 0.0
+                state.weight = min_w
             return
 
         for i, state in enumerate(states):

@@ -129,10 +129,15 @@ class KWTransformer(nn.Module):
 
         # 2. Transformer encoder (Flash Attention via PyTorch 2.0+ SDPA)
         if self._use_flash_attn and torch.cuda.is_available():
-            with torch.backends.cuda.sdp_kernel(
-                enable_flash=True, enable_math=False, enable_mem_efficient=False,
-            ):
-                encoded = self.encoder(emb)  # (B, T, d_model)
+            try:
+                with torch.backends.cuda.sdp_kernel(
+                    enable_flash=True, enable_math=False, enable_mem_efficient=False,
+                ):
+                    encoded = self.encoder(emb)  # (B, T, d_model)
+            except RuntimeError:
+                # Flash Attention not supported (head dim, seq len, GPU arch) —
+                # fall back to PyTorch's default SDPA backend (math/mem_efficient).
+                encoded = self.encoder(emb)
         else:
             encoded = self.encoder(emb)  # (B, T, d_model)
 

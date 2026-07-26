@@ -184,7 +184,9 @@ class DictionaryCompressor:
             right_idx = None
             for j in range(n_unique):
                 if cluster_count[j] > 0 and j != left_idx:
-                    if cluster_min[j] == cluster_max[left_idx] or cluster_min[j] > cluster_max[left_idx]:
+                    # Use tolerance to avoid floating-point equality failures
+                    if (abs(cluster_min[j] - cluster_max[left_idx]) < 1e-12
+                            or cluster_min[j] > cluster_max[left_idx]):
                         right_idx = j
                         break
 
@@ -262,10 +264,12 @@ class DictionaryCompressor:
         degenerate cluster topology), this binner guarantees output.
         """
         k = self.max_clusters
-        # Equal-frequency binning
-        sorted_data = unique_vals[inverse]
-        sorted_data.sort()
-        bin_edges = np.percentile(sorted_data, np.linspace(0, 100, k + 1))
+        # Equal-frequency binning on sorted unique values (avoids full-array sort)
+        sorted_unique = np.sort(unique_vals)
+        weights = counts / counts.sum()
+        cum_weights = np.cumsum(weights)
+        bin_edges = np.interp(np.linspace(0, 1, k + 1), cum_weights, sorted_unique)
+        bin_edges[-1] += 1e-10  # include max value
         bin_edges[-1] += 1e-10  # include max value
 
         order = np.digitize(unique_vals[inverse], bin_edges[:-1]) - 1
