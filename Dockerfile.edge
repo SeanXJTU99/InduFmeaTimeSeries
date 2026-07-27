@@ -10,6 +10,7 @@ LABEL component="vLLM + TensorRT-LLM + AWQ INT4 inference"
 # System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.10 python3.10-dev python3-pip \
+    build-essential \
     libopenblas-dev libopenmpi-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -25,6 +26,12 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 # Model and configs
 COPY checkpoints/fmea-awq-int4 ./checkpoints/fmea-awq-int4
 COPY src/deploy/ ./src/deploy/
+COPY src/safety/ ./src/safety/
+COPY src/signal/ ./src/signal/
+COPY setup.py .
+
+# Build C extensions (covariance pack, compressor)
+RUN python setup.py build_ext --inplace
 COPY configs/ ./configs/
 
 # DMA device access

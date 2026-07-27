@@ -13,6 +13,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.10 python3.10-dev python3-pip \
+    build-essential \
     git curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -23,8 +24,12 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir vllm>=0.5.0
 
-# Application code
+# Application code (inc. C extension sources)
 COPY src/ ./src/
+COPY setup.py .
+
+# Build C extensions (covariance pack, compressor)
+RUN python setup.py build_ext --inplace
 COPY configs/ ./configs/
 COPY checkpoints/ ./checkpoints/
 COPY data/ ./data/

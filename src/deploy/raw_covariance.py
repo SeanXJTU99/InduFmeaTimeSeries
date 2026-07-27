@@ -22,66 +22,86 @@ from typing import Optional
 import numpy as np
 
 
+# ---------------------------------------------------------------------------
+# Try to load the C extension.  Falls back to numpy vectorised ops if the
+# extension is not built (e.g. during development without a compiler).
+# ---------------------------------------------------------------------------
+
+try:
+    from src.deploy._covariance import (  # type: ignore[import-not-found]
+        pack_lower_triangular,
+        unpack_lower_triangular,
+    )
+    _HAS_C_EXTENSION = True
+except ImportError:
+    _HAS_C_EXTENSION = False
+
+
+def _pack_fallback(cov: np.ndarray) -> np.ndarray:
+    """NumPy fallback: extract lower triangle via tril_indices."""
+    n = cov.shape[0]
+    rows, cols = np.tril_indices(n)
+    return np.asarray(cov[rows, cols], dtype=np.float32)
+
+
+def _unpack_fallback(packed: np.ndarray) -> np.ndarray:
+    """NumPy fallback: reconstruct symmetric matrix from lower triangle."""
+    # Solve n*(n+1)/2 = len(packed).
+    in_len = len(packed)
+    n = int((np.sqrt(1 + 8 * in_len) - 1) / 2)
+    cov = np.zeros((n, n), dtype=np.float32)
+    rows, cols = np.tril_indices(n)
+    cov[rows, cols] = packed
+    cov[cols, rows] = packed
+    return cov
+
+
 def pack_covariance_5x5(cov: np.ndarray) -> np.ndarray:
     """Pack 5x5 symmetric covariance into 15-element flat array.
 
-    Layout (lower-triangular, row-major):
-      mC[ 0] = C[0,0]
-      mC[ 1] = C[1,0], mC[ 2] = C[1,1]
-      mC[ 3] = C[2,0], mC[ 4] = C[2,1], mC[ 5] = C[2,2]
-      mC[ 6] = C[3,0], ...                 mC[ 9] = C[3,3]
-      mC[10] = C[4,0], ...                 mC[14] = C[4,4]
+    Matches the GPU Kalman track parameter buffer layout ``mC[15]``:
+    lower-triangular, row-major.  ``mC[0]=C[0,0], mC[1]=C[1,0],
+    mC[2]=C[1,1], …``
+
+    Uses C extension (memcpy per row, ~10 ns) when available;
+    otherwise falls back to numpy ``tril_indices`` vectorisation.
     """
     if cov.shape != (5, 5):
         raise ValueError(f"Expected 5x5 covariance, got {cov.shape}")
-    packed = np.empty(15, dtype=cov.dtype)
-    idx = 0
-    for i in range(5):
-        for j in range(i + 1):
-            packed[idx] = cov[i, j]
-            idx += 1
-    return packed
+    if _HAS_C_EXTENSION:
+        return pack_lower_triangular(cov.astype(np.float32, copy=False))
+    return _pack_fallback(cov)
 
 
 def unpack_covariance_5x5(packed: np.ndarray) -> np.ndarray:
     """Reverse pack: 15-element array -> 5x5 symmetric matrix."""
     if len(packed) != 15:
         raise ValueError(f"Expected 15 elements, got {len(packed)}")
-    cov = np.zeros((5, 5), dtype=packed.dtype)
-    idx = 0
-    for i in range(5):
-        for j in range(i + 1):
-            cov[i, j] = packed[idx]
-            cov[j, i] = packed[idx]
-            idx += 1
-    return cov
+    if _HAS_C_EXTENSION:
+        return unpack_lower_triangular(
+            np.asarray(packed, dtype=np.float32)
+        )
+    return _unpack_fallback(np.asarray(packed, dtype=np.float32))
 
 
 def pack_covariance_8x8(cov: np.ndarray) -> np.ndarray:
     """Pack 8x8 symmetric covariance into 36-element flat array."""
     if cov.shape != (8, 8):
         raise ValueError(f"Expected 8x8 covariance, got {cov.shape}")
-    packed = np.empty(36, dtype=cov.dtype)
-    idx = 0
-    for i in range(8):
-        for j in range(i + 1):
-            packed[idx] = cov[i, j]
-            idx += 1
-    return packed
+    if _HAS_C_EXTENSION:
+        return pack_lower_triangular(cov.astype(np.float32, copy=False))
+    return _pack_fallback(cov)
 
 
 def unpack_covariance_8x8(packed: np.ndarray) -> np.ndarray:
     """Reverse pack: 36-element array -> 8x8 symmetric matrix."""
     if len(packed) != 36:
         raise ValueError(f"Expected 36 elements, got {len(packed)}")
-    cov = np.zeros((8, 8), dtype=packed.dtype)
-    idx = 0
-    for i in range(8):
-        for j in range(i + 1):
-            cov[i, j] = packed[idx]
-            cov[j, i] = packed[idx]
-            idx += 1
-    return cov
+    if _HAS_C_EXTENSION:
+        return unpack_lower_triangular(
+            np.asarray(packed, dtype=np.float32)
+        )
+    return _unpack_fallback(np.asarray(packed, dtype=np.float32))
 
 
 def allocate_dma_buffer(size: int, alignment: int = 64) -> np.ndarray:

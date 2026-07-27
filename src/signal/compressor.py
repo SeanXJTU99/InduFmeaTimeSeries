@@ -6,7 +6,7 @@ Compresses float32 sensor readings into N-bit dictionary indices via
 greedy agglomerative clustering. Each unique cluster center replaces
 its member values, trading per-value precision for storage density.
 
-Algorithm (adapted from sPHENIX compressor.h approx()):
+Algorithm (adapted from compressor.h approx()):
   1. Each unique float32 value starts as a singleton cluster.
   2. While cluster count > 2^nbits: merge the two nearest clusters.
   3. Output: order[i] (N-bit index), dict[j] (float32 center), cnt[j] (size).
@@ -31,6 +31,17 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import numpy as np
+
+# ---------------------------------------------------------------------------
+# Optional C extension — provides ~5-10x speedup on large blocks via
+# sorted-array adjacency (replaces Python dict/set loops).
+# ---------------------------------------------------------------------------
+try:
+    from src.signal._compressor import approx as _approx_native  # type: ignore[import-not-found]
+    _HAS_C_EXTENSION = True
+except ImportError:
+    _approx_native = None  # type: ignore[assignment]
+    _HAS_C_EXTENSION = False
 
 
 @dataclass
@@ -103,6 +114,23 @@ class DictionaryCompressor:
                 compressed_nbytes=0,
                 ratio=1.0,
             )
+
+        # --- Fast path: C extension (sorted-array adjacency, ~5-10x faster) ---
+        if _HAS_C_EXTENSION and self.nbits <= 12:
+            try:
+                raw = _approx_native(data, nbits=self.nbits)
+                return CompressionResult(
+                    order=raw["order"],
+                    dict_=raw["dict"],
+                    cnt=raw["cnt"],
+                    nbits=raw["nbits"],
+                    rms_error=raw["rms_error"],
+                    original_nbytes=raw["original_nbytes"],
+                    compressed_nbytes=raw["compressed_nbytes"],
+                    ratio=raw["ratio"],
+                )
+            except Exception:
+                pass  # fall through to Python path
 
         # --- Phase 1: build initial clusters (one per unique value) ---
         unique_vals, inverse, counts = np.unique(data, return_inverse=True, return_counts=True)

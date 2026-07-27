@@ -100,33 +100,32 @@ class MatrixGuard:
         self._state[device_type, sensor_id, int(severity)] = True
 
     def block_all_severities(self, device_type: int, sensor_id: int) -> None:
-        """Block a sensor across all severity levels."""
-        for sev in Severity:
-            self.block(device_type, sensor_id, sev)
+        """Block a sensor across all severity levels (numpy slice, single memcpy)."""
+        self._validate_indices(device_type, sensor_id, Severity.INFO)
+        self._state[device_type, sensor_id, :] = False
 
     def allow_all_severities(self, device_type: int, sensor_id: int) -> None:
-        """Allow a sensor across all severity levels."""
-        for sev in Severity:
-            self.allow(device_type, sensor_id, sev)
+        """Allow a sensor across all severity levels (numpy slice, single memcpy)."""
+        self._validate_indices(device_type, sensor_id, Severity.INFO)
+        self._state[device_type, sensor_id, :] = True
 
     #
     # --- Bulk operations ----------------------------------------------------
     #
 
     def block_severity_below(self, threshold: Severity) -> None:
-        """Globally block all messages below a severity threshold."""
-        cfg = self.config
-        for dt in range(cfg.n_device_types):
-            for sid in range(cfg.n_sensors):
-                for sev in range(min(int(threshold), cfg.n_severities)):
-                    self._state[dt, sid, sev] = False
+        """Globally block all messages below a severity threshold.
+
+        Uses numpy slice assignment — single memset under the hood,
+        not a Python triple-loop.
+        """
+        t = min(int(threshold), self.config.n_severities)
+        if t > 0:
+            self._state[:, :, :t] = False
 
     def set_device_type(self, device_type: int, action: bool) -> None:
-        """Allow or block all sensors of a device type."""
-        cfg = self.config
-        for sid in range(cfg.n_sensors):
-            for sev in range(cfg.n_severities):
-                self._state[device_type, sid, sev] = action
+        """Allow or block all sensors of a device type (numpy slice)."""
+        self._state[device_type, :, :] = action
 
     def all_on(self) -> None:
         """Reset entire matrix to ALLOW (emergency override)."""
