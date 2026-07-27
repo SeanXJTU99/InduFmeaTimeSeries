@@ -45,6 +45,12 @@ class KWTConfig:
     kalman_q: float = 1e-4
     kalman_r: float = 1e-2
 
+    # Langevin physics correction (PINFDiT inference plugin)
+    enable_langevin: bool = False
+    langevin_n_steps: int = 5
+    langevin_step_size: float = 0.05
+    langevin_alpha: float = 0.1
+
     # Output heads
     anomaly_threshold: float = 0.5
 
@@ -153,6 +159,73 @@ class KWTransformer(nn.Module):
         abundance_pred = self.abundance_head(pooled)  # (B, 1)
 
         return anomaly_scores, abundance_pred
+
+    def apply_langevin(
+        self,
+        anomaly_scores: torch.Tensor,
+        abundance_pred: torch.Tensor,
+        features: dict[str, float] | None = None,
+        kwt_baseline: dict[str, float] | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Apply Langevin physics correction to scalar outputs (inference only).
+
+        This is the PINFDiT "Generalist-to-Specialist" plugin: the frozen
+        KWT produces a statistically-plausible prediction, then Langevin
+        dynamics steers it toward physical consistency without retraining.
+
+        Args:
+            anomaly_scores: (B, 1) tensor from KWT forward pass.
+            abundance_pred: (B, 1) tensor from KWT forward pass.
+            features: optional PLC measurements per batch item.
+            kwt_baseline: original KWT predictions (used as score target).
+
+        Returns:
+            (refined_anomaly_scores, refined_abundance_pred) — same shapes.
+        """
+        if not self.config.enable_langevin:
+            return anomaly_scores, abundance_pred
+
+        try:
+            from src.models.langevin_correction import (
+                LangevinConfig,
+                LangevinCorrector,
+            )
+            from src.detection.energy_function import DistillationEnergyFunction
+
+            lc_cfg = LangevinConfig(
+                n_steps=self.config.langevin_n_steps,
+                step_size=self.config.langevin_step_size,
+                alpha=self.config.langevin_alpha,
+            )
+            lc = LangevinCorrector(
+                energy_func=DistillationEnergyFunction(),
+                config=lc_cfg,
+            )
+        except ImportError:
+            return anomaly_scores, abundance_pred
+
+        batch_size = anomaly_scores.shape[0]
+        refined_scores = []
+        refined_abund = []
+
+        for i in range(batch_size):
+            a_score = float(anomaly_scores[i].item())
+            a_abund = float(abundance_pred[i].item()) * 100.0  # [0,1] → %
+
+            preds = {"abundance_pct": a_abund, "anomaly_score": a_score}
+            baseline = kwt_baseline.copy() if kwt_baseline else dict(preds)
+            feats = features or {}
+
+            refined = lc.correct(preds, feats, baseline)
+            refined_scores.append(refined["anomaly_score"])
+            refined_abund.append(refined["abundance_pct"] / 100.0)
+
+        return (
+            torch.tensor(refined_scores, device=anomaly_scores.device,
+                         dtype=anomaly_scores.dtype).view(-1, 1),
+            torch.tensor(refined_abund, device=abundance_pred.device,
+                         dtype=abundance_pred.dtype).view(-1, 1),
+        )
 
     def reset_kalman(self) -> None:
         """Reset the Kalman feedback state."""

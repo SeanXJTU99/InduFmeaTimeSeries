@@ -62,6 +62,7 @@ class PhysicsInformedDetector:
 
     def __init__(self, config: PhysicsDetectorConfig | None = None) -> None:
         self.config = config or PhysicsDetectorConfig()
+        self._energy_func = None  # lazy init
 
     # ------------------------------------------------------------------
     # Public API
@@ -103,12 +104,71 @@ class PhysicsInformedDetector:
     def explain(self, features: Dict[str, float]) -> List[str]:
         """Return human-readable explanations for top contributing features.
 
+        Uses the energy function gradient (if available) to attribute
+        the anomaly score to individual physics constraints.  Falls back
+        to z-score breakdown when the energy function is unavailable.
+
         Args:
             features: same dict as :meth:`score`.
 
         Returns:
             List of explanation strings, most significant first.
         """
+        # Prefer energy-based attribution.
+        try:
+            grad_f = self._energy_gradient_wrt_features(features)
+            if grad_f:
+                sorted_items = sorted(
+                    grad_f.items(), key=lambda x: abs(x[1]), reverse=True
+                )
+                explanations: List[str] = []
+                for name, g in sorted_items[:5]:
+                    if abs(g) > 0.0:
+                        direction = "high" if g < 0 else "low"
+                        explanations.append(
+                            f"{name}: {direction} deviation (energy grad={g:.4f})"
+                        )
+                return explanations or self._zscore_explain(features)
+        except Exception:
+            pass
+        return self._zscore_explain(features)
+
+    def energy_score(
+        self,
+        features: Dict[str, float],
+        predictions: Optional[Dict[str, float]] = None,
+    ) -> Tuple[float, Dict[str, float]]:
+        """Compute anomaly score using the physics residual energy function.
+
+        Maps the raw energy K(x; F) ∈ (-∞, 0] to an anomaly score in [0, ∞)
+        via score = -K (higher → more physically inconsistent).
+
+        Args:
+            features: PLC measurements.
+            predictions: optional model outputs (``abundance_pct``,
+                ``anomaly_score``).  Uses nominal defaults if omitted.
+
+        Returns:
+            (energy_score, energy_gradient_dict).
+        """
+        if self._energy_func is None:
+            from src.detection.energy_function import (
+                DistillationEnergyFunction,
+            )
+            self._energy_func = DistillationEnergyFunction()
+
+        preds: Dict[str, float] = {
+            "abundance_pct": 50.0,
+            "anomaly_score": 0.0,
+        }
+        if predictions is not None:
+            preds.update(predictions)
+
+        energy = self._energy_func.energy(features, preds)
+        grad = self._energy_func.gradient(features, preds)
+        return float(-energy), grad
+
+    def _zscore_explain(self, features: Dict[str, float]) -> List[str]:
         _, breakdown = self.score(features)
         sorted_items = sorted(breakdown.items(), key=lambda x: abs(x[1]), reverse=True)
         explanations: List[str] = []
@@ -117,6 +177,19 @@ class PhysicsInformedDetector:
                 direction = "high" if z > 0 else "low"
                 explanations.append(f"{name}: {direction} deviation (z={z:.2f})")
         return explanations
+
+    def _energy_gradient_wrt_features(
+        self, features: Dict[str, float]
+    ) -> Dict[str, float]:
+        if self._energy_func is None:
+            from src.detection.energy_function import (
+                DistillationEnergyFunction,
+            )
+            self._energy_func = DistillationEnergyFunction()
+        return self._energy_func.gradient_wrt_features(
+            features,
+            {"abundance_pct": 50.0, "anomaly_score": 0.0},
+        )
 
     # ------------------------------------------------------------------
     # Internal
