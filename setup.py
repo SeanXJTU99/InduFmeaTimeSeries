@@ -12,16 +12,18 @@ import numpy as np
 
 covariance_ext = Extension(
     "_covariance",
-    sources=["src/deploy/_covariance.c"],
+    sources=["src/deploy/_covariance.cpp"],
     include_dirs=[np.get_include()],
-    extra_compile_args=["-O3", "-march=native"],
+    extra_compile_args=["-O3", "-march=native", "-std=c++17"],
+    language="c++",
 )
 
 compressor_ext = Extension(
     "_compressor",
-    sources=["src/signal/_compressor.c"],
+    sources=["src/signal/_compressor.cpp"],
     include_dirs=[np.get_include()],
-    extra_compile_args=["-O3", "-march=native"],
+    extra_compile_args=["-O3", "-march=native", "-std=c++17"],
+    language="c++",
 )
 
 setup(
