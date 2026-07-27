@@ -3,7 +3,7 @@
 from src.training.sft_dataset_builder import SFTDatasetBuilder, build_sft_dataset
 from src.training.qlora_finetune import QLoRAFinetuner, run_qlora
 from src.training.dpo_dataset_builder import DPODatasetBuilder, build_dpo_dataset
-from src.training.dpo_train import DPOTrainer, run_dpo
+from src.training.dpo_train import AlignTrainer, run_dpo, run_grpo, fmea_reward_fn
 from src.training.merge_lora import LoRAMerger, merge_lora
 
 __all__ = [
@@ -13,8 +13,10 @@ __all__ = [
     "run_qlora",
     "DPODatasetBuilder",
     "build_dpo_dataset",
-    "DPOTrainer",
+    "AlignTrainer",
     "run_dpo",
+    "run_grpo",
+    "fmea_reward_fn",
     "LoRAMerger",
     "merge_lora",
 ]
