@@ -27,6 +27,48 @@
 | 2c — 推理 | 2026.01 | Flash Attention(KWT Encoder ~40%↓)；Prefix Cache 预热(system prompt 编码→0)；ngram 投机采样(TTFT ~50%↓, 零配置)；Triton 融合算子(KWT 前处理~30%↓)；xgrammar 结构化输出(JSON Schema→FSM, O(1) token 掩码)；KV Cache 量化(L40S FP8 / Orin INT8, KV 显存 50%↓)。全部热插拔，无硬件变更。 |
 | 3 — 智能 | 2026.01–05 | 卡尔曼-小波-Transformer 级联、PPO+MCTS 强化学习、反事实推理、Jetson AGX Orin 边缘 DMA/NPU 部署 |
 
+## 技术选型 — 理由与实现细节
+
+### 1. 信号处理（DAF 卡尔曼-小波级联）
+
+- **两级卡尔曼** — *为什么:* 第一级 (Q=1e-5, R=1e-3) 吸收 EMI/测量噪声，第二级 (Q=1e-6, R=5e-3) 跟踪物理过程；按位号独立调 Q/R（TE-301 一级 R=1e-2 vs FT-301 R=2e-3），而非全局单一协方差。*怎么实现:* 标量状态预测/更新 + innovation 剪裁；DAF（Deterministic Annealing Filter, Fruehwirth & Strandlie 1999）在 32 样本滑窗（步长 16）内做批量卡尔曼+联合权重 — beta 对数退火 100→0.1 共 5 步，权重 <0.1 判为离群。
+- **小波降噪 (db4, 3 级)** — *为什么:* db4 紧支撑贴合工业瞬态；软阈值保留趋势，硬阈值会削掉。*怎么实现:* universal 阈值 σ·√(2 ln n)，σ 用 MAD（median/0.6745）；按信号类型覆盖（压力 2 级、流量 db6 2 级、温度 4 级、阀位 1 级+SURE）。
+- **BCO 硬时钟对齐 + DTW 回退** — *为什么:* DTW O(N²) 无法实时；PLC/串口/Excel 流自带 NTP 时间戳，对齐可降到 O(1)。*怎么实现:* 每数据源注册 delay_ns 偏移，事件按 ntp_ns+delay 分桶；全部源在 max_spread_ns=10 ms 内到齐才算对齐。DTW（Sakoe-Chiba 带、平方欧氏）保留为 NTP 不可用时的回退。
+- **虚拟软测量** — *为什么:* 同位素丰度来自异步化验报表，无在线仪表。*怎么实现:* XGBoost（可选 LSTM）5 特征、60 样本回看、预测步长 1；物理先验回退钳位 [0,100]%。
+- **字典压缩** — *为什么:* 8-bit 字典量化使 PLC 流存储减半，RMS 误差 <0.5% 量程。*怎么实现:* 唯一值贪心凝聚聚类压缩到 ≤2^nbits 个质心；流式分块 1024。
+
+### 2. RAG 知识工程
+
+- **语义重写** — *为什么:* 原始 FMEA 表分块后因果链断裂。*怎么实现:* 行级重写为固定 S/O/D 句式，保留 RPN=S×O×D 关联。
+- **混合检索 (BM25 0.4 + dense 0.6, RRF k=60)** — *为什么:* 稠密向量匹配不到设备位号 (TE-301)；BM25 精确命中 tag，bge-large-en-v1.5 (1024 维) 兜语义；RRF 基于排名融合，无需分数归一化。*怎么实现:* 两路各 top-50 → RRF Σ w/(k+rank+1) → top-10；cross-encoder (ms-marco-MiniLM-L-6-v2) 重排 20→5。
+- **FMEA Bilinks 因果图** — *为什么:* 向量检索给的是主题相关而非因果相关的命中，用于诊断是危险的。*怎么实现:* 4 类节点（传感器/故障模式/根因/缓解）、3 类双向边（observes/caused_by/mitigated_by）；从告警传感器 BFS 限深 3；BM25+BGE 保留为新型故障回退。
+
+### 3. 安全与结构化输出
+
+- **Matrix Guard (3D 布尔矩阵)** — *为什么:* 物理不可能（丰度>100%）必须硬拦截而非"纠正"；50×2000×5 (500KB) 布尔矩阵 O(1) 查表 <1ns，JSON Schema 链则 ~10µs。*怎么实现:* numpy 切片批量 block/allow；路由三态：block / pass（severity≤INFO 免 LLM 模板应答）/ llm。
+- **约束解码 + Pydantic + Guardrails** — *为什么:* 三层防御应对不同失效点。*怎么实现:* outlines logit 掩码约束 JSON Schema（enum: 21 位号、10 故障模式；model_validator 强制 rpn=S×O×D）；guardrails 钳位物理边界（丰度 [0,100]、阀位 [0,100]%）并拒收 "100% sure" 类措辞。
+- **xgrammar 结构化输出** — *为什么:* 逐 token Python logit 检查 ~10µs/token；编译为 FSM 后掩码 O(1)。*怎么实现:* Grammar.from_json_schema → FSM，每解码步生成 token 掩码；vLLM `--guided-decoding-backend xgrammar`；缺库回退 Pydantic+Guardrails。
+- **引用追踪** — *为什么:* 无引用的诊断主张不可核验，工业审计要求可溯源。*怎么实现:* 4 种引用模式；得分=有效引用/总 claims；claim 用启发式识别（位号 `[A-Z]{2,}-\d{3}` 或含数字句）。
+
+### 4. LangGraph Agent
+
+- **为什么选 StateGraph:** 有向图+条件边是确定性、可审计的，优于自由 agent 循环 — 高危工艺需要可证明的路由。*怎么实现:* ContextResolver → FMEAReasoner → ReportGenerator；置信门 (<0.60) → SystemFallback；Reflection 节点批判草稿，feedback_gate 允许一轮重试；checkpointer 支持人在回路。
+- **意图分类** — 关键词法（每类 15/10/8 个关键词），置信度=命中占比，可选 LLM few-shot。不训分类器：零训练成本、行为确定。
+- **上下文管理** — 4000 token 预算、CJK 感知估算（中文÷2 + ASCII÷4）、FIFO 裁剪 + 抽取式摘要（10 个领域关键词、800 字摘要），先裁剪再进 LLM。
+
+### 5. 后训练（SFT + DPO/GRPO + 量化）
+
+- **QLoRA 微调 Qwen2.5-7B-Instruct** — *为什么:* 单卡 L40S 可跑 4-bit NF4 微调；r=64/α=128 保留工业领域容量。*怎么实现:* NF4+双重量化、bf16 计算、全 7 个线性层、3 epochs、有效 batch 32、lr 2e-4 cosine、paged AdamW-8bit、flash-attn；SFT 数据 ≤5000 条（重写 FMEA 分块+人工 QA+安全拒绝样本）。
+- **DPO / GRPO 对齐** — *为什么:* GRPO（group 4, kl 0.04）不需要 DPO 的参考模型 — 省一个 7B 的显存。*怎么实现:* 规则奖励 ∈[−2,+2] 直接编码工业安全：引用 +1.0、安全拒绝 +0.5、有效位号 +0.3、幻觉位号每个 −1.0、不可逆动作关键词 −2.0、S×O×D 齐全 +0.3。
+- **AWQ INT4** — *为什么:* 激活感知量化比纯权重量化更保 FMEA 机理推理精度；group 128。*怎么实现:* SFT 数据集取 128 条校准，显存 ~75%↓。
+
+### 6. 推理与边缘部署
+
+- **vLLM（服务端, L40S）** — *为什么:* 灵活服务 LangGraph+RAG；prefix cache 与投机解码热插拔。*怎么实现:* AWQ INT4 + FP8 KV（sm_89: 56→28 KiB/token；64×4096 tok 最坏 14.7→7.3 GB）、ngram 投机（5 token, lookup 2–4）、chunked prefill、显存利用率 90%、预热请求预计算 ~800 token system prompt 的 KV。
+- **TensorRT-LLM（边缘, Orin）** — *为什么:* Ampere sm_87 无 FP8 硬件 — INT8 KV 是最大安全降幅；编译引擎保证 TTFT <20ms 确定性。*怎么实现:* int4_awq + INT8 KV、context FMHA、gemm 插件 FP16、remove_input_padding、kv_cache_free_gpu_mem_fraction 0.40、MAX_UTILIZATION 调度。
+- **DMA 异构直通** — *为什么:* PLC/串口数据跨 CPU↔GPU 拷贝 ~50µs；单次 DMA 突发免拷贝。*怎么实现:* 协方差 5×5→15 下三角展平；22 float (88B) 卡尔曼包单次突发、64B 对齐缓冲、传输超时 100µs；C 扩展 ~10ns/行。
+- **Triton 融合算子** — *为什么:* 分离 kernel 的中间张量反复回写显存。*怎么实现:* 小波拼接+线性+位置编码+dropout 单 kernel（Orin 上前处理 ~30%↓）；无 Triton 时纯 PyTorch 回退。
+
 ## 推理优化 (Phase 2c)
 
 | 优化项 | 技术 | 延迟影响 |
