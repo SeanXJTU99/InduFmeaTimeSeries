@@ -24,7 +24,7 @@
 | 1 — 基础 | 2025.04–08 | 卡尔曼-小波级联、DTW 对齐、虚拟软测量、物性约束异常检测、EWMA+KDE 自适应基线、RAG 四层防幻觉 |
 | 2 — Agent | 2025.09–12 | LangGraph 有向图智能体、BM25+BGE 混合检索+重排、约束解码+Pydantic+护栏、QLoRA SFT+GRPO/DPO 对齐、AWQ INT4 量化 |
 | 2b — 性能 | 2025.12 | **内存:** DAF 消除小波缓冲区；字典量化(Float32→8-bit, PLC 存储 50%↓)；3D 布尔矩阵(500KB L3)替代 JSON Schema 链；Bilinks 邻接表释放~500MB GPU 显存。**异构:** 协方差(5×5→15) DMA 直通 Orin NPU(~50μs→~5μs)。**延迟:** O(1) 矩阵查表<1ns vs ~10μs JSON Schema；O(1) 硬时钟对齐 vs O(N²) DTW；O(V+E) BFS vs O(N×D) 向量搜索。零额外硬件。 |
-| 2c — 推理 | 2026.01 | Flash Attention(KWT Encoder ~40%↓)；Prefix Cache 预热(system prompt 编码→0)；ngram 投机采样(TTFT ~50%↓, 零配置)；Triton 融合算子(KWT 前处理~30%↓)；xgrammar 结构化输出(JSON Schema→FSM, O(1) token 掩码)。全部热插拔，无硬件变更。 |
+| 2c — 推理 | 2026.01 | Flash Attention(KWT Encoder ~40%↓)；Prefix Cache 预热(system prompt 编码→0)；ngram 投机采样(TTFT ~50%↓, 零配置)；Triton 融合算子(KWT 前处理~30%↓)；xgrammar 结构化输出(JSON Schema→FSM, O(1) token 掩码)；KV Cache 量化(L40S FP8 / Orin INT8, KV 显存 50%↓)。全部热插拔，无硬件变更。 |
 | 3 — 智能 | 2026.01–05 | 卡尔曼-小波-Transformer 级联、PPO+MCTS 强化学习、反事实推理、Jetson AGX Orin 边缘 DMA/NPU 部署 |
 
 ## 推理优化 (Phase 2c)
@@ -36,6 +36,7 @@
 | ngram 投机采样 | vLLM n-gram 匹配, 无需草稿模型 | TTFT ~50%↓ |
 | Triton 融合算子 | 小波拼接+线性投影+位置编码 单 kernel | 前处理 ~30%↓ |
 | xgrammar 结构化输出 | JSON Schema→FSM, O(1) token 掩码 | Token 生成 ~10-20%↑ |
+| KV Cache 量化 | FP8(L40S) / INT8(Orin) KV cache | KV 显存 50%↓ |
 
 端到端延迟: **~150ms → ~20ms** (Phase 1 基线的 7.5×)。
 

@@ -15,6 +15,9 @@ build:
   use_gemm_plugin: true
   enable_context_fmha: true
   remove_input_padding: true
+  # Orin (sm_87, Ampere) has no FP8 hardware -> INT8 KV cache only.
+  # trtllm-build --quantize kv_cache --kv_cache_quantization int8
+  kv_cache_quantization: "int8"   # KV memory halves: 28 KiB/token vs 56 KiB FP16
 
 runtime:
   gpu_weights_percent: 1.0

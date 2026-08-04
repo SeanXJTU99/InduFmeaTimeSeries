@@ -25,7 +25,7 @@ and **serial RS485 byte streams** into a unified agent loop.
 | 1 — Foundation | 2025.04–08 | Kalman-Wavelet cascade, DTW alignment, virtual soft sensor, physics-informed anomaly detection, EWMA+KDE adaptive baseline, RAG with four-layer anti-hallucination |
 | 2 — Agent | 2025.09–12 | LangGraph StateGraph agent, BM25+BGE hybrid retrieval + cross-encoder reranking, constrained decoding + Pydantic + Guardrails, QLoRA SFT + GRPO/DPO alignment, AWQ INT4 quantization |
 | 2b — Perf. Eng. | 2025.12 | **Memory:** DAF eliminates wavelet buffer; dictionary quantization (Float32→8-bit, 50% storage reduction for PLC streams); 3D boolean matrix (500KB L3) replaces JSON Schema chain; Bilinks adjacency list frees ~500MB GPU VRAM. **Heterogeneous Compute:** raw covariance (5×5→15 array) DMA to Jetson Orin NPU (~50μs→~5μs). **Latency:** O(1) matrix lookup <1ns vs ~10μs JSON Schema; O(1) NTP alignment vs O(N²) DTW; O(V+E) BFS vs O(N×D) vector search. Zero additional hardware. |
-| 2c — Inf. Opt. | 2026.01 | **LLM Inference:** Flash Attention (KWT Encoder ~40% ↓); vLLM Prefix Cache warmup (system prompt encoding → 0); ngram Speculative Decoding (TTFT ~50% ↓, zero-setup); Triton fused kernel (KWT pre-processing ~30% ↓); xgrammar Structured Output (JSON Schema → FSM, O(1) token masking). All optimizations are drop-in — no hardware change. |
+| 2c — Inf. Opt. | 2026.01 | **LLM Inference:** Flash Attention (KWT Encoder ~40% ↓); vLLM Prefix Cache warmup (system prompt encoding → 0); ngram Speculative Decoding (TTFT ~50% ↓, zero-setup); Triton fused kernel (KWT pre-processing ~30% ↓); xgrammar Structured Output (JSON Schema → FSM, O(1) token masking); KV Cache quantization (FP8 on L40S / INT8 on Orin, KV memory 50% ↓). All optimizations are drop-in — no hardware change. |
 | 3 — Intelligence | 2026.01–05 | Kalman-Wavelet-Transformer cascade, Model-based RL (PPO + MCTS), counterfactual advisor, DMA/NPU edge deployment on Jetson AGX Orin |
 
 ## Key Results
@@ -39,6 +39,7 @@ and **serial RS485 byte streams** into a unified agent loop.
 | False-alarm rate | 12/day | 1.5/day | **88% ↓** |
 | Miss rate | 5% | 0% | **eliminated** |
 | Model VRAM (edge) | 14 GB (FP16) | 4 GB (INT4) | **72% ↓** |
+| Peak VRAM incl. KV cache (edge, 8×3072 tok) | 15.4 GB (FP16) | 4.7 GB (INT4 + INT8 KV) | **69% ↓** |
 | Hardware cost/column | — | ~25K RMB | **edge+server** |
 
 ## Architecture Overview
@@ -87,6 +88,7 @@ Drop-in latency reductions with zero additional hardware:
 | ngram Speculative Decoding | vLLM n-gram matching, no draft model needed | TTFT ~50% ↓ |
 | Triton Fused Kernel | Wavelet concat + linear + pos_encoding fused in one kernel | KWT pre-processing ~30% ↓ |
 | xgrammar Structured Output | JSON Schema → FSM, O(1) token masking | Token generation ~10-20% ↑ |
+| KV Cache Quantization | FP8 (L40S) / INT8 (Orin) KV cache | KV memory 50% ↓ |
 
 End-to-end latency: **~150ms → ~20ms** (7.5× improvement from Phase 1 baseline).
 
@@ -131,7 +133,7 @@ uncertainty cases involving ambiguous causal reasoning invoke the LLM.
 ┌─────────────────────────────────────────────┐
 │  Edge: Jetson AGX Orin (64 GB unified mem)  │
 │  • DAF Kalman <100 µs (CPU)                 │
-│  • AWQ INT4 7B → TensorRT-LLM, TTFT <20 ms  │
+│  • AWQ INT4 7B + INT8 KV → TensorRT-LLM, TTFT <20 ms │
 │  • DMA PLC/Serial → NPU (~5 µs)             │
 │  • FAISS in-memory RAG                      │
 │  Hardware: ~21-32K RMB per distillation unit │

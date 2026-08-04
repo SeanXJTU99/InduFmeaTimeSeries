@@ -21,6 +21,12 @@ scheduler:
   enable_prefix_caching: true     # shared system-prompt KV reused across all FMEA requests
   enable_chunked_prefill: true    # split long prefill into chunks for better scheduling
 
+# ---- KV Cache Quantization ----
+# FP8 on Ada (L40S, sm_89): halves KV memory vs FP16 (28 vs 56 KiB/token).
+# Worst case 64 seqs x 4096 tok: 14.7 GB (FP16) -> 7.3 GB (FP8).
+kv_cache:
+  dtype: "fp8"                    # vLLM engine arg: --kv-cache-dtype fp8
+
 # ---- Speculative Decoding ----
 # ngram mode: zero-setup — vLLM auto-matches n-grams from prompt context.
 # FMEA JSON outputs have repetitive structure (keys, failure_mode enum, etc.)

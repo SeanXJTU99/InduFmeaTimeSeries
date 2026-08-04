@@ -16,6 +16,7 @@ Latency. All upgrades require zero additional hardware.
 | Memory | PLC data storage | Float32 raw arrays | Dictionary quantization (8-bit) | 50% storage reduction | None |
 | Memory | Safety gateway | JSON Schema + Pydantic (GC-heavy) | 3D boolean matrix (500KB L3) | Zero GC pressure | None |
 | Memory | Knowledge retrieval | FAISS vector index (GPU VRAM) | Bilinks adjacency list (CPU) | ~500MB GPU VRAM freed | None |
+| Memory | LLM KV cache | FP16 (56 KiB/token) | FP8 (L40S) / INT8 (Orin), 28 KiB/token | 50% KV memory ↓; edge peak 5.4→4.7 GB | None |
 | Heterogeneous | Kalman state transfer | NumPy→pickle→cudaMemcpy | 15-element raw array DMA | ~50μs→~5μs (10x) | None |
 | Latency | Hard-rule check | JSON Schema parsing ~10μs | Boolean array lookup | <1ns (10,000x) | None |
 | Latency | Time alignment | O(N²) DTW | O(1) NTP bucket lookup | Seconds→zero | None |
